@@ -113,18 +113,25 @@ export async function PATCH(req: Request) {
     delete body.imageFilename;
     delete body.imageContentType;
 
-    let updateBody = body;
-    let result = await supabase.from('products').update(updateBody).eq('id', body.id);
+    const productId = body.id;
+    const updateBody = { ...body };
+    delete updateBody.id;
+
+    console.log('[Products API] PATCH update', { productId, updateBody });
+
+    let result = await supabase.from('products').update(updateBody).eq('id', productId);
     if (result.error && result.error.code === '42703') {
-      updateBody = { ...body };
-      delete updateBody.images;
-      result = await supabase.from('products').update(updateBody).eq('id', body.id);
+      const patchBody = { ...updateBody };
+      delete patchBody.images;
+      result = await supabase.from('products').update(patchBody).eq('id', productId);
     }
     if (result.error) {
+      console.error('[Products API] PATCH failed', result.error);
       return NextResponse.json({ error: result.error.message }, { status: 500 });
     }
     return NextResponse.json({ data: result.data }, { status: 200 });
   } catch (err: any) {
+    console.error('[Products API] PATCH exception', err);
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }
