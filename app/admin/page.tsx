@@ -480,7 +480,7 @@ export default function AdminPage() {
         <aside className="rounded-[2rem] border border-white/10 bg-slate-900/90 p-5 shadow-glass backdrop-blur-xl">
           <div className="mb-8 space-y-2">
             <p className="text-sm uppercase tracking-[0.35em] text-cyan-300">Admin Panel</p>
-            <h2 className="text-3xl font-bold">Ethio Market</h2>
+            <h2 className="text-3xl font-bold">Lemi's Marketplace</h2>
             <p className="text-sm text-slate-400">Manage products, monitor orders, and update your storefront.</p>
           </div>
           <nav className="space-y-2 text-sm text-slate-300">
