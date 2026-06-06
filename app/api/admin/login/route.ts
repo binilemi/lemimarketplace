@@ -1,17 +1,20 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
+function getSupabaseClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseServiceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-if (!supabaseUrl || !supabaseServiceRole) {
-  throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in environment');
+  if (!supabaseUrl || !supabaseServiceRole) {
+    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in environment');
+  }
+
+  return createClient(supabaseUrl, supabaseServiceRole);
 }
-
-const supabase = createClient(supabaseUrl, supabaseServiceRole);
 
 export async function POST(req: Request) {
   try {
+    const supabase = getSupabaseClient();
     const { username, password } = await req.json();
     if (!username || !password) {
       return NextResponse.json({ error: 'username and password required' }, { status: 400 });

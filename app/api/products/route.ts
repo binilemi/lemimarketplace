@@ -1,19 +1,18 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-function getEnv(name: string, value: string | undefined): string {
-  if (!value) {
-    throw new Error(`Missing required environment variable: ${name}`);
+function getSupabaseClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseServiceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !supabaseServiceRole) {
+    throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in environment');
   }
-  return value;
+
+  return createClient(supabaseUrl, supabaseServiceRole);
 }
 
-const supabaseUrl = getEnv('NEXT_PUBLIC_SUPABASE_URL', process.env.NEXT_PUBLIC_SUPABASE_URL);
-const supabaseServiceRole = getEnv('SUPABASE_SERVICE_ROLE_KEY', process.env.SUPABASE_SERVICE_ROLE_KEY);
-
-const supabase = createClient(supabaseUrl, supabaseServiceRole);
-
-async function uploadImages(body: any) {
+async function uploadImages(supabase: any, body: any) {
   const imageUrls: string[] = [];
 
   if (Array.isArray(body.imagesToUpload) && body.imagesToUpload.length > 0) {
@@ -66,7 +65,8 @@ async function uploadImages(body: any) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const imageUrls = await uploadImages(body);
+    const supabase = getSupabaseClient();
+    const imageUrls = await uploadImages(supabase, body);
 
     if (imageUrls.length > 0) {
       body.images = imageUrls;
@@ -96,12 +96,13 @@ export async function POST(req: Request) {
 
 export async function PATCH(req: Request) {
   try {
+    const supabase = getSupabaseClient();
     const body = await req.json();
     if (!body.id) {
       return NextResponse.json({ error: 'Product id is required for updates.' }, { status: 400 });
     }
 
-    const imageUrls = await uploadImages(body);
+    const imageUrls = await uploadImages(supabase, body);
     if (imageUrls.length > 0) {
       body.images = imageUrls;
       body.image = imageUrls[0];
