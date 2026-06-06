@@ -99,15 +99,29 @@ export default function AdminPage() {
 
   const login = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (username === adminUsername && password === adminPassword) {
-      setAuthenticated(true);
-      setUsername('');
-      setPassword('');
-      setLoginError('');
-      return;
-    }
-    setLoginError('Wrong login details. Please check your username and password.');
-    window.setTimeout(() => setLoginError(''), 5000);
+    (async () => {
+      try {
+        const resp = await fetch('/api/admin/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password }),
+        });
+        const json = await resp.json();
+        if (resp.ok && json.ok) {
+          setAuthenticated(true);
+          setUsername('');
+          setPassword('');
+          setLoginError('');
+          return;
+        }
+
+        setLoginError(json.error || 'Wrong login details. Please check your username and password.');
+        window.setTimeout(() => setLoginError(''), 5000);
+      } catch (err) {
+        setLoginError('Login failed. Please try again later.');
+        window.setTimeout(() => setLoginError(''), 5000);
+      }
+    })();
   };
 
   const saveCredentials = async () => {
@@ -153,6 +167,7 @@ export default function AdminPage() {
     const productData: any = {
       name: String(formData.get('name') || '').trim(),
       category: String(formData.get('category') || ''),
+      description: String(formData.get('description') || '').trim(),
       price: Number(formData.get('price') || 0),
       stock: Number(formData.get('stock') || 0),
       status: String(formData.get('status') || 'Active'),
@@ -280,6 +295,15 @@ export default function AdminPage() {
       console.error(err);
     }
     setProducts((current) => current.filter((product) => product.id !== id));
+    try {
+      await fetch('/api/revalidate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: '/' }),
+      });
+    } catch (err) {
+      console.warn('Failed to call revalidate endpoint', err);
+    }
   };
 
   const toggleFeatured = async (id: number) => {
@@ -537,6 +561,16 @@ export default function AdminPage() {
                         defaultValue={editingProduct?.category ?? ''}
                         className="mt-2 w-full rounded-3xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none focus:border-cyan-400"
                         placeholder="Electronics"
+                      />
+                    </label>
+                    <label className="block text-sm text-slate-300">
+                      Description
+                      <textarea
+                        name="description"
+                        defaultValue={editingProduct?.description ?? ''}
+                        rows={3}
+                        className="mt-2 w-full rounded-3xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none focus:border-cyan-400"
+                        placeholder="Enter a short product description"
                       />
                     </label>
                     <label className="block text-sm text-slate-300">

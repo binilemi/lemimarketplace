@@ -15,7 +15,7 @@ export default function Footer() {
           <h3 className="mb-4 text-sm uppercase tracking-[0.35em] text-slate-500">Links</h3>
           <ul className="space-y-3 text-sm">
             <li><Link href="#home" className="hover:text-white">Home</Link></li>
-            <li><Link href="#featured" className="hover:text-white">Deals</Link></li>
+            <li><Link href="#products" className="hover:text-white">Products</Link></li>
             <li><Link href="#telegram" className="hover:text-white">Telegram</Link></li>
             <li><Link href="/admin" className="hover:text-white">Admin</Link></li>
           </ul>

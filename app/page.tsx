@@ -1,22 +1,14 @@
 'use client';
 
 import React from 'react';
-import { ArrowRight, Cpu, Shirt, Smartphone, Star, Zap, ShoppingBag, Send } from 'lucide-react';
+import { ArrowRight, ShoppingBag, Send } from 'lucide-react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { categories as defaultCategories, featuredProducts as fallbackProducts } from '../lib/data';
+import { categories as defaultCategories } from '../lib/data';
 import { createClient as createBrowserClient } from '../utils/supabase/client';
 import TelegramSection from '../components/TelegramSection';
 import Footer from '../components/Footer';
 import Navbar from '../components/Navbar';
-
-const iconMap = {
-  Smartphone: <Smartphone size={24} />,
-  Shirt: <Shirt size={24} />,
-  Cpu: <Cpu size={24} />,
-  Star: <Star size={24} />,
-  Zap: <Zap size={24} />,
-};
 
 type ProductCard = {
   id: number;
@@ -44,29 +36,21 @@ function formatTelegramLink(product: ProductCard, origin: string) {
 }
 
 export default function HomePage() {
-  const [featuredProducts, setFeaturedProducts] = React.useState<ProductCard[]>(fallbackProducts);
-  const [allProducts, setAllProducts] = React.useState<ProductCard[]>(fallbackProducts);
-  const [categoryOptions, setCategoryOptions] = React.useState<string[]>(['All', ...defaultCategories.map((category) => category.title)]);
+  const [allProducts, setAllProducts] = React.useState<ProductCard[]>([]);
+  const [categoryOptions, setCategoryOptions] = React.useState<string[]>(['All']);
   const [activeCategory, setActiveCategory] = React.useState('All');
   const [supabaseMessage, setSupabaseMessage] = React.useState<string>('');
   const [selectedProduct, setSelectedProduct] = React.useState<ProductCard | null>(null);
   const [cardImageIndex, setCardImageIndex] = React.useState<Record<number, number>>({});
   const [detailImageIndex, setDetailImageIndex] = React.useState(0);
   const [origin, setOrigin] = React.useState('');
+  const productsSectionRef = React.useRef<HTMLElement | null>(null);
 
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
       setOrigin(window.location.origin);
     }
   }, []);
-
-  const categoryIconMap = {
-    Electronics: <Smartphone size={24} />,
-    Fashion: <Shirt size={24} />,
-    Gaming: <Cpu size={24} />,
-    Accessories: <Star size={24} />,
-    Phones: <Zap size={24} />,
-  } as const;
 
   React.useEffect(() => {
     async function loadProducts() {
@@ -93,7 +77,7 @@ export default function HomePage() {
         const { data, error } = response;
 
         if (error) {
-          setSupabaseMessage('Unable to load products from Supabase. Showing fallback data.');
+          setSupabaseMessage('Unable to load products from Supabase. Please check the inventory later.');
           console.warn(error);
           return;
         }
@@ -129,12 +113,13 @@ export default function HomePage() {
           const uniqueCategories = Array.from(new Set(products.map((product) => product.category || 'Uncategorized')));
           setCategoryOptions(['All', ...uniqueCategories]);
           setAllProducts(products);
-
-          const featured = products.filter((product) => product.featured);
-          setFeaturedProducts(featured.length > 0 ? featured.slice(0, 3) : products.slice(0, 3));
+        } else {
+          setSupabaseMessage('No active products are available right now.');
+          setCategoryOptions(['All']);
+          setAllProducts([]);
         }
       } catch (err) {
-        setSupabaseMessage('Unable to load products. Showing fallback data.');
+        setSupabaseMessage('Unable to load products. Please refresh later.');
         console.error(err);
       }
     }
@@ -166,7 +151,7 @@ export default function HomePage() {
             Curated premium products, fast ordering through Telegram, and bold modern design for shoppers and business owners.
           </motion.p>
           <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.9, delay: 0.2 }} className="mt-8 flex flex-wrap gap-3">
-            <Link href="#featured" className="inline-flex items-center gap-2 rounded-3xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 shadow-lg shadow-cyan-400/20 transition hover:-translate-y-0.5">
+            <Link href="#categories" className="inline-flex items-center gap-2 rounded-3xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 shadow-lg shadow-cyan-400/20 transition hover:-translate-y-0.5">
               Shop Now
               <ArrowRight size={16} />
             </Link>
@@ -196,297 +181,170 @@ export default function HomePage() {
                     ? 'bg-cyan-400 text-slate-950'
                     : 'border border-white/10 bg-slate-950/80 text-white hover:bg-white/5'
                 }`}
-                onClick={() => setActiveCategory(categoryName)}
+                onClick={() => {
+                  setActiveCategory(categoryName);
+                  productsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
               >
                 {categoryName}
               </button>
             ))}
           </div>
         </div>
-
-        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
-          {categoryOptions.slice(1).map((categoryName) => {
-            const defaultCategory = defaultCategories.find((category) => category.title === categoryName);
-            const description = defaultCategory?.description ?? `Explore ${categoryName} products`;
-            const icon = categoryIconMap[categoryName as keyof typeof categoryIconMap] ?? <Star size={24} />;
-
-            return (
-              <motion.div key={categoryName} whileHover={{ y: -8 }} className="rounded-[2rem] border border-white/10 bg-slate-950/85 p-6 shadow-glass backdrop-blur-xl transition">
-                <div className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-3xl bg-cyan-500/10 text-cyan-300 shadow-lg shadow-cyan-500/5">
-                  {icon}
-                </div>
-                <h3 className="text-xl font-semibold">{categoryName}</h3>
-                <p className="mt-3 text-sm text-slate-400">{description}</p>
-              </motion.div>
-            );
-          })}
-        </div>
       </section>
 
-      <section id="featured" className="mx-auto max-w-5xl px-6 pb-16">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-sm uppercase tracking-[0.30em] text-cyan-300">Featured Products</p>
-            <h2 className="mt-3 text-3xl font-bold sm:text-4xl">Trending items ready to order.</h2>
-          </div>
-        </div>
-
-        {selectedProduct ? (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={() => setSelectedProduct(null)}>
-            <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-[2rem] border border-white/10 bg-slate-950/95 p-6 shadow-2xl backdrop-blur-xl" onClick={(e) => e.stopPropagation()}>
-              <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
-                <div className="w-full lg:w-7/12">
-                  <div className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-slate-900/90">
-                    <img
-                      src={selectedProduct.images?.[detailImageIndex] ?? selectedProduct.image}
-                      alt={selectedProduct.name}
-                      className="h-80 w-full object-cover sm:h-[28rem]"
-                    />
-                    {selectedProduct.images && selectedProduct.images.length > 1 ? (
-                      <div className="absolute inset-x-0 top-1/2 flex items-center justify-between px-4">
-                        <button
-                          type="button"
-                          onClick={() => setDetailImageIndex((current) => (current - 1 + selectedProduct.images!.length) % selectedProduct.images!.length)}
-                          className="rounded-full bg-black/40 p-2 text-white transition hover:bg-black/60"
-                        >
-                          ‹
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setDetailImageIndex((current) => (current + 1) % selectedProduct.images!.length)}
-                          className="rounded-full bg-black/40 p-2 text-white transition hover:bg-black/60"
-                        >
-                          ›
-                        </button>
-                      </div>
-                    ) : null}
-                  </div>
-                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                    {selectedProduct.images?.map((image, index) => (
-                      <button
-                        key={`${selectedProduct.id}-thumb-${index}`}
-                        type="button"
-                        onClick={() => setDetailImageIndex(index)}
-                        className={`overflow-hidden rounded-3xl border p-1 transition ${index === detailImageIndex ? 'border-cyan-400' : 'border-white/10'}`}
-                      >
-                        <img src={image} alt={`${selectedProduct.name} ${index + 1}`} className="h-20 w-full object-cover" />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="space-y-6 lg:w-5/12">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="text-sm uppercase tracking-[0.35em] text-cyan-300">Product details</p>
-                      <h3 className="mt-3 text-3xl font-semibold text-white">{selectedProduct.name}</h3>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedProduct(null)}
-                      className="rounded-3xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white transition hover:bg-white/10"
-                    >
-                      Close
-                    </button>
-                  </div>
-
-                  <div className="space-y-4 rounded-[2rem] border border-white/10 bg-slate-900/90 p-5">
-                    <p className="text-sm uppercase tracking-[0.35em] text-slate-400">Category</p>
-                    <p className="text-lg font-semibold text-white">{selectedProduct.category}</p>
-                    <p className="text-sm leading-7 text-slate-300">{selectedProduct.description}</p>
-                  </div>
-
-                  <div className="space-y-4 rounded-[2rem] border border-white/10 bg-slate-900/90 p-5">
-                    <p className="text-sm uppercase tracking-[0.35em] text-slate-400">Price</p>
-                    <p className="text-3xl font-bold text-white">{selectedProduct.price} ETB</p>
-                    <p className="text-sm text-slate-500 line-through">{selectedProduct.originalPrice} ETB</p>
-                  </div>
-
-                  <a
-                    href={formatTelegramLink(selectedProduct, origin)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-3xl bg-cyan-400 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
-                  >
-                    Order now
-                    <ShoppingBag size={18} />
-                  </a>
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : null}
-
-        <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {featuredProducts.map((product) => {
-            const images = product.images?.length ? product.images : [product.image];
-            const currentIndex = cardImageIndex[product.id] ?? 0;
-            const currentImage = images[currentIndex] ?? product.image;
-
-            return (
-              <motion.div
-                key={product.id}
-                whileHover={{ y: -6 }}
-                onClick={() => {
-                  setSelectedProduct(product);
-                  setDetailImageIndex(0);
-                }}
-                className="group relative cursor-pointer overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950/90 shadow-glass backdrop-blur-xl transition"
-              >
-                <div className="relative overflow-hidden">
-                  <img src={currentImage} alt={product.name} className="h-64 w-full object-cover transition duration-500 group-hover:scale-105" />
-                  <span className="absolute left-4 top-4 rounded-full bg-emerald-500/15 px-3 py-1 text-sm text-emerald-300">{product.discount}% off</span>
-                  {images.length > 1 ? (
-                    <div className="absolute inset-x-0 top-1/2 flex items-center justify-between px-3">
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setCardImageIndex((state) => ({
-                            ...state,
-                            [product.id]: (currentIndex - 1 + images.length) % images.length,
-                          }));
-                        }}
-                        className="rounded-full bg-black/40 p-2 text-white transition hover:bg-black/60"
-                      >
-                        ‹
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setCardImageIndex((state) => ({
-                            ...state,
-                            [product.id]: (currentIndex + 1) % images.length,
-                          }));
-                        }}
-                        className="rounded-full bg-black/40 p-2 text-white transition hover:bg-black/60"
-                      >
-                        ›
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
-                <div className="space-y-4 p-6">
-                  <div>
-                    <h3 className="text-2xl font-semibold">{product.name}</h3>
-                    <p className="mt-2 text-sm text-slate-400">{product.category}</p>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-2xl font-bold text-white">{product.price} ETB</p>
-                      <p className="text-sm text-slate-500 line-through">{product.originalPrice} ETB</p>
-                    </div>
-                    <a
-                      href={formatTelegramLink(product, origin)}
-                      target="_blank"
-                      rel="noreferrer"
-                      onClick={(event) => event.stopPropagation()}
-                      className="inline-flex items-center gap-2 rounded-3xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
-                    >
-                      Order now
-                      <ShoppingBag size={18} />
-                    </a>
-                  </div>
-                </div>
-              </motion.div>
-            );
-          })}
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-5xl px-6 pb-16">
+      <section ref={productsSectionRef} id="products" className="mx-auto max-w-5xl px-6 pb-16">
         <div className="mb-8">
           <p className="text-sm uppercase tracking-[0.30em] text-cyan-300">Products by category</p>
           <h2 className="mt-3 text-3xl font-bold sm:text-4xl">All products in {activeCategory === 'All' ? 'every category' : activeCategory}.</h2>
         </div>
 
-        {Object.entries(groupedProducts).map(([categoryName, items]) => (
-          <div key={categoryName} className="mb-12">
-            <div className="mb-6 flex items-center justify-between gap-4 rounded-[2rem] border border-white/10 bg-slate-950/90 p-6 shadow-glass backdrop-blur-xl">
-              <div>
-                <p className="text-sm uppercase tracking-[0.30em] text-cyan-300">{categoryName}</p>
-                <h3 className="mt-2 text-2xl font-semibold text-white">{items.length} item{items.length === 1 ? '' : 's'}</h3>
+        {filteredProducts.length === 0 ? (
+          <div className="rounded-[2rem] border border-white/10 bg-slate-950/90 p-10 text-center text-slate-300 shadow-glass backdrop-blur-xl">
+            <p className="text-lg font-semibold text-white">No products available right now.</p>
+            <p className="mt-3 text-sm">{supabaseMessage || 'Check back later or update inventory through the admin dashboard.'}</p>
+          </div>
+        ) : (
+          Object.entries(groupedProducts).map(([categoryName, items]) => (
+            <div key={categoryName} className="mb-12">
+              <div className="mb-6 flex items-center justify-between gap-4 rounded-[2rem] border border-white/10 bg-slate-950/90 p-6 shadow-glass backdrop-blur-xl">
+                <div>
+                  <p className="text-sm uppercase tracking-[0.30em] text-cyan-300">{categoryName}</p>
+                  <h3 className="mt-2 text-2xl font-semibold text-white">{items.length} item{items.length === 1 ? '' : 's'}</h3>
+                </div>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {items.map((product) => {
+                  const images = product.images?.length ? product.images : [product.image];
+                  const currentIndex = cardImageIndex[product.id] ?? 0;
+                  const currentImage = images[currentIndex] ?? product.image;
+
+                  return (
+                    <motion.div
+                      key={product.id}
+                      whileHover={{ y: -6 }}
+                      onClick={() => {
+                        setSelectedProduct(product);
+                        setDetailImageIndex(0);
+                      }}
+                      className="group relative cursor-pointer overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950/90 shadow-glass backdrop-blur-xl transition"
+                    >
+                      <div className="relative overflow-hidden">
+                        <img src={currentImage} alt={product.name} className="h-52 w-full object-cover transition duration-500 group-hover:scale-105 sm:h-64" />
+                        <span className="absolute left-4 top-4 rounded-full bg-emerald-500/15 px-3 py-1 text-sm text-emerald-300">{product.discount}% off</span>
+                        {images.length > 1 ? (
+                          <div className="absolute inset-x-0 top-1/2 flex items-center justify-between px-3">
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setCardImageIndex((state) => ({
+                                  ...state,
+                                  [product.id]: (currentIndex - 1 + images.length) % images.length,
+                                }));
+                              }}
+                              className="rounded-full bg-black/40 p-2 text-white transition hover:bg-black/60"
+                            >
+                              ‹
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setCardImageIndex((state) => ({
+                                  ...state,
+                                  [product.id]: (currentIndex + 1) % images.length,
+                                }));
+                              }}
+                              className="rounded-full bg-black/40 p-2 text-white transition hover:bg-black/60"
+                            >
+                              ›
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
+                      <div className="space-y-4 p-5">
+                        <div>
+                          <h4 className="text-2xl font-semibold">{product.name}</h4>
+                          <p className="mt-2 text-sm text-slate-400">{product.category}</p>
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p className="text-2xl font-bold text-white">{product.price} ETB</p>
+                            <p className="text-sm text-slate-500 line-through">{product.originalPrice} ETB</p>
+                          </div>
+                          <a
+                            href={formatTelegramLink(product, origin)}
+                            target="_blank"
+                            rel="noreferrer"
+                            onClick={(event) => event.stopPropagation()}
+                            className="inline-flex items-center gap-2 rounded-3xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
+                          >
+                            Order now
+                            <ShoppingBag size={18} />
+                          </a>
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
               </div>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {items.map((product) => {
-                const images = product.images?.length ? product.images : [product.image];
-                const currentIndex = cardImageIndex[product.id] ?? 0;
-                const currentImage = images[currentIndex] ?? product.image;
+          ))
+        )}
+      </section>
 
-                return (
-                  <motion.div
-                    key={product.id}
-                    whileHover={{ y: -6 }}
-                    onClick={() => {
-                      setSelectedProduct(product);
-                      setDetailImageIndex(0);
-                    }}
-                    className="group relative cursor-pointer overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950/90 shadow-glass backdrop-blur-xl transition"
-                  >
-                    <div className="relative overflow-hidden">
-                      <img src={currentImage} alt={product.name} className="h-52 w-full object-cover transition duration-500 group-hover:scale-105 sm:h-64" />
-                      <span className="absolute left-4 top-4 rounded-full bg-emerald-500/15 px-3 py-1 text-sm text-emerald-300">{product.discount}% off</span>
-                      {images.length > 1 ? (
-                        <div className="absolute inset-x-0 top-1/2 flex items-center justify-between px-3">
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setCardImageIndex((state) => ({
-                                ...state,
-                                [product.id]: (currentIndex - 1 + images.length) % images.length,
-                              }));
-                            }}
-                            className="rounded-full bg-black/40 p-2 text-white transition hover:bg-black/60"
-                          >
-                            ‹
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setCardImageIndex((state) => ({
-                                ...state,
-                                [product.id]: (currentIndex + 1) % images.length,
-                              }));
-                            }}
-                            className="rounded-full bg-black/40 p-2 text-white transition hover:bg-black/60"
-                          >
-                            ›
-                          </button>
-                        </div>
-                      ) : null}
-                    </div>
-                    <div className="space-y-4 p-5">
-                      <div>
-                        <h4 className="text-2xl font-semibold">{product.name}</h4>
-                        <p className="mt-2 text-sm text-slate-400">{product.category}</p>
-                      </div>
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="text-2xl font-bold text-white">{product.price} ETB</p>
-                          <p className="text-sm text-slate-500 line-through">{product.originalPrice} ETB</p>
-                        </div>
-                        <a
-                          href={formatTelegramLink(product, origin)}
-                          target="_blank"
-                          rel="noreferrer"
-                          onClick={(event) => event.stopPropagation()}
-                          className="inline-flex items-center gap-2 rounded-3xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
-                        >
-                          Order now
-                          <ShoppingBag size={18} />
-                        </a>
-                      </div>
-                    </div>
-                  </motion.div>
-                );
-              })}
+      {selectedProduct ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+          onClick={() => setSelectedProduct(null)}
+        >
+          <div
+            className="w-full max-w-4xl rounded-[2rem] border border-white/10 bg-slate-950/95 p-5 shadow-glow"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="grid gap-4 sm:grid-cols-[120px_1fr] sm:items-start">
+              <img
+                src={selectedProduct.images?.[detailImageIndex] ?? selectedProduct.image}
+                alt={selectedProduct.name}
+                className="h-44 w-full rounded-[1.5rem] object-cover sm:h-56"
+              />
+              <div className="flex flex-col justify-between gap-4">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.35em] text-cyan-300">{selectedProduct.category}</p>
+                  <h3 className="mt-2 text-2xl font-semibold text-white">{selectedProduct.name}</h3>
+                  <p className="mt-3 text-sm leading-6 text-slate-300">{selectedProduct.description}</p>
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-2xl font-bold text-white">{selectedProduct.price} ETB</p>
+                    {selectedProduct.originalPrice ? (
+                      <p className="text-sm text-slate-500 line-through">{selectedProduct.originalPrice} ETB</p>
+                    ) : null}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <a
+                      href={formatTelegramLink(selectedProduct, origin)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 rounded-3xl bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
+                    >
+                      Order now
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedProduct(null)}
+                      className="inline-flex items-center justify-center rounded-3xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white transition hover:bg-white/10"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-        ))}
-      </section>
+        </div>
+      ) : null}
 
       <TelegramSection />
       <Footer />
