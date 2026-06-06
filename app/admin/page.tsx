@@ -21,6 +21,17 @@ function getStoredSettings() {
   }
 }
 
+async function fileToBase64(file: File) {
+  const arrayBuffer = await file.arrayBuffer();
+  let binary = '';
+  const bytes = new Uint8Array(arrayBuffer);
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
 export default function AdminPage() {
   const [username, setUsername] = React.useState('');
   const [password, setPassword] = React.useState('');
@@ -188,28 +199,18 @@ export default function AdminPage() {
       try {
         productData.imagesToUpload = await Promise.all(
           files.map(async (file) => {
-            const dataUrl = await new Promise<string>((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onload = () => resolve(String(reader.result));
-              reader.onerror = reject;
-              reader.readAsDataURL(file);
-            });
-
-            const match = dataUrl.match(/^data:(.+);base64,(.*)$/);
-            if (!match) {
-              throw new Error('Failed to parse image file to base64');
-            }
+            const base64 = await fileToBase64(file);
 
             return {
-              contentType: match[1],
-              base64: match[2],
+              contentType: file.type || 'application/octet-stream',
+              base64,
               filename: file.name,
             };
           }),
         );
       } catch (err) {
         console.error('Image base64 read error:', err);
-        window.alert('Image processing failed. Please try again.');
+        window.alert('Image processing failed. Please try again with a different image.');
       }
     } else if (editingProduct) {
       if (editingProduct.images) {
