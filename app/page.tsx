@@ -55,6 +55,7 @@ export default function HomePage() {
   React.useEffect(() => {
     async function loadProducts() {
       try {
+        console.log('[Homepage] Connecting to Supabase...');
         const supabase = createBrowserClient();
         const baseSelect = 'id,name,category,price,original_price,discount,image,status,featured';
         const optionalSelect = 'description,images';
@@ -66,7 +67,7 @@ export default function HomePage() {
           .order('featured', { ascending: false });
 
         if (response.error && response.error.code === '42703') {
-          console.warn('Optional product columns missing, retrying without images/description:', response.error.message);
+          console.warn('[Homepage] Optional columns missing, retrying without images/description');
           response = await supabase
             .from('products')
             .select(baseSelect)
@@ -77,12 +78,13 @@ export default function HomePage() {
         const { data, error } = response;
 
         if (error) {
-          setSupabaseMessage('Unable to load products from Supabase. Please check the inventory later.');
-          console.warn(error);
+          setSupabaseMessage(`❌ Supabase error (${error.code}): ${error.message}`);
+          console.error('[Homepage] Supabase error:', error.code, error.message);
           return;
         }
 
         if (data?.length) {
+          console.log(`[Homepage] Loaded ${data.length} products from Supabase`);
           const products: ProductCard[] = data.map((item: any) => {
             const providedImages = Array.isArray(item.images)
               ? item.images.filter(Boolean)
@@ -114,13 +116,14 @@ export default function HomePage() {
           setCategoryOptions(['All', ...uniqueCategories]);
           setAllProducts(products);
         } else {
-          setSupabaseMessage('No active products are available right now.');
+          console.log('[Homepage] No active products found');
+          setSupabaseMessage('No active products available yet.');
           setCategoryOptions(['All']);
           setAllProducts([]);
         }
       } catch (err) {
-        setSupabaseMessage('Unable to load products. Please refresh later.');
-        console.error(err);
+        setSupabaseMessage(`Error: ${String(err)}`);
+        console.error('[Homepage] Exception:', err);
       }
     }
 

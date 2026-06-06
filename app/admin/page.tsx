@@ -68,27 +68,30 @@ export default function AdminPage() {
     async function loadAdminData() {
       try {
         const supabase = createBrowserClient();
+        console.log('[Admin] Connecting to Supabase...');
 
         const { data: settingsData, error: settingsError } = await supabase.from('admin_settings').select('username,password').single();
         if (settingsError) {
-          console.warn('Supabase admin settings load failed:', settingsError.message);
-          setStatusMessage('Unable to load admin settings from Supabase. Using local credentials.');
+          console.error('[Admin] Settings error:', settingsError.code, settingsError.message);
+          setStatusMessage(`⚠️ Settings load failed: ${settingsError.message}`);
         } else if (settingsData) {
           setAdminUsername(settingsData.username || DEFAULT_USERNAME);
           setAdminPassword(settingsData.password || DEFAULT_PASSWORD);
+          console.log('[Admin] Settings loaded');
         }
 
         const { data: productData, error: productError } = await supabase.from('products').select('*').order('id', { ascending: false });
         if (productError) {
-          console.warn('Supabase product load failed:', productError.message);
-          setStatusMessage('Unable to load products from Supabase. Using fallback inventory.');
+          console.error('[Admin] Products error:', productError.code, productError.message);
+          setStatusMessage(`❌ Supabase unavailable: ${productError.message} (${productError.code}). Showing fallback data.`);
         } else if (productData) {
           setProducts(productData as ProductItem[]);
-          setStatusMessage('Loaded product inventory from Supabase.');
+          console.log(`[Admin] Loaded ${productData.length} products from Supabase`);
+          setStatusMessage(`✓ Loaded ${productData.length} products from Supabase.`);
         }
       } catch (err) {
-        setStatusMessage('Error loading data. Using fallback data.');
-        console.error(err);
+        setStatusMessage(`Error loading data: ${String(err)}`);
+        console.error('[Admin] Catch error:', err);
       }
 
       setLoading(false);
