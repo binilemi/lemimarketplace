@@ -31,9 +31,8 @@ type ProductCard = {
   featured: boolean;
 };
 
-function formatTelegramLink(product: ProductCard) {
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://ethio-market.com';
-  const productUrl = `${origin}/?product=${encodeURIComponent(product.name)}`;
+function formatTelegramLink(product: ProductCard, origin: string) {
+  const productUrl = origin ? `${origin}/?product=${encodeURIComponent(product.name)}` : `/?product=${encodeURIComponent(product.name)}`;
   const message = encodeURIComponent(
     `Hello, I want to order:\n` +
       `Product: ${product.name}\n` +
@@ -53,6 +52,13 @@ export default function HomePage() {
   const [selectedProduct, setSelectedProduct] = React.useState<ProductCard | null>(null);
   const [cardImageIndex, setCardImageIndex] = React.useState<Record<number, number>>({});
   const [detailImageIndex, setDetailImageIndex] = React.useState(0);
+  const [origin, setOrigin] = React.useState('');
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setOrigin(window.location.origin);
+    }
+  }, []);
 
   const categoryIconMap = {
     Electronics: <Smartphone size={24} />,
@@ -296,7 +302,7 @@ export default function HomePage() {
                   </div>
 
                   <a
-                    href={formatTelegramLink(selectedProduct)}
+                    href={formatTelegramLink(selectedProduct, origin)}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex w-full items-center justify-center gap-2 rounded-3xl bg-cyan-400 px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
@@ -371,7 +377,7 @@ export default function HomePage() {
                       <p className="text-sm text-slate-500 line-through">{product.originalPrice} ETB</p>
                     </div>
                     <a
-                      href={formatTelegramLink(product)}
+                      href={formatTelegramLink(product, origin)}
                       target="_blank"
                       rel="noreferrer"
                       onClick={(event) => event.stopPropagation()}
@@ -463,7 +469,7 @@ export default function HomePage() {
                           <p className="text-sm text-slate-500 line-through">{product.originalPrice} ETB</p>
                         </div>
                         <a
-                          href={formatTelegramLink(product)}
+                          href={formatTelegramLink(product, origin)}
                           target="_blank"
                           rel="noreferrer"
                           onClick={(event) => event.stopPropagation()}
