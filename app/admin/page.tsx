@@ -267,9 +267,9 @@ export default function AdminPage() {
         }
       }
     } catch (err) {
-      const fallbackItem = { id: Date.now(), ...productData };
-      setProducts((current) => [fallbackItem, ...current]);
-      console.error(err);
+      console.error('Product save failed', err);
+      window.alert('Product save failed. Please check the console for details and try again.');
+      setStatusMessage('Failed to save product.');
     }
 
     setFormOpen(false);
