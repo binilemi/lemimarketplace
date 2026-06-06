@@ -14,6 +14,7 @@ function getSupabaseClient() {
 
 async function uploadImages(supabase: any, body: any) {
   const imageUrls: string[] = [];
+  const MAX_UPLOAD_BYTES = 8 * 1024 * 1024; // 8MB per file (server-side guard)
 
   if (Array.isArray(body.imagesToUpload) && body.imagesToUpload.length > 0) {
     for (const imageToUpload of body.imagesToUpload) {
@@ -21,6 +22,9 @@ async function uploadImages(supabase: any, body: any) {
       const filename = imageToUpload.filename || `product-${Date.now()}.png`;
       const filePath = `product-images/${Date.now()}-${filename}`.replace(/\s+/g, '-');
       const buffer = Buffer.from(imageBase64, 'base64');
+      if (buffer.length > MAX_UPLOAD_BYTES) {
+        throw new Error(`File ${filename} is too large (${Math.round(buffer.length / 1024)} KB). Maximum allowed is ${Math.round(MAX_UPLOAD_BYTES / 1024)} KB.`);
+      }
 
       const { error: uploadError } = await supabase.storage.from('product-images').upload(filePath, buffer, {
         contentType: imageToUpload.contentType || 'image/png',
@@ -43,8 +47,11 @@ async function uploadImages(supabase: any, body: any) {
     const filename = body.imageFilename || `product-${Date.now()}.png`;
     const filePath = `product-images/${Date.now()}-${filename}`.replace(/\s+/g, '-');
     const buffer = Buffer.from(imageBase64, 'base64');
+      if (buffer.length > MAX_UPLOAD_BYTES) {
+        throw new Error(`File ${filename} is too large (${Math.round(buffer.length / 1024)} KB). Maximum allowed is ${Math.round(MAX_UPLOAD_BYTES / 1024)} KB.`);
+      }
 
-    const { error: uploadError } = await supabase.storage.from('product-images').upload(filePath, buffer, {
+      const { error: uploadError } = await supabase.storage.from('product-images').upload(filePath, buffer, {
       contentType: body.imageContentType || 'image/png',
       upsert: true,
     });

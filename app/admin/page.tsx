@@ -195,7 +195,16 @@ export default function AdminPage() {
 
     const defaultImage = 'https://images.unsplash.com/photo-1510557880182-3ddba4b9d491?auto=format&fit=crop&w=900&q=80';
 
+    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB per file (client-side)
+
     if (files.length > 0) {
+      const tooLarge = files.find((f) => f.size > MAX_FILE_SIZE);
+      if (tooLarge) {
+        window.alert(`Image "${tooLarge.name}" is too large. Maximum size is 5 MB.`);
+        setStatusMessage('Image too large. Choose smaller image files.');
+        return;
+      }
+
       try {
         productData.imagesToUpload = await Promise.all(
           files.map(async (file) => {
@@ -586,6 +595,14 @@ export default function AdminPage() {
                         multiple
                         onChange={(event) => {
                           const files = Array.from(event.currentTarget.files || []);
+                          const MAX_FILE_SIZE = 5 * 1024 * 1024;
+                          const tooLarge = files.find((f) => f.size > MAX_FILE_SIZE);
+                          if (tooLarge) {
+                            window.alert(`Image "${tooLarge.name}" is too large. Maximum size is 5 MB.`);
+                            setStatusMessage('One or more images exceed 5 MB and were not selected.');
+                            return;
+                          }
+
                           setSelectedImageFiles(files);
                           setImagePreviewUrls(files.map((file) => URL.createObjectURL(file)));
                         }}
