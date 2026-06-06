@@ -32,6 +32,59 @@ async function fileToBase64(file: File) {
   return btoa(binary);
 }
 
+async function resizeImageFile(file: File, maxWidth = 1600, maxHeight = 1600, quality = 0.8): Promise<Blob> {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const img = document.createElement('img');
+      img.src = URL.createObjectURL(file);
+      await img.decode();
+      const width = img.naturalWidth || img.width;
+      const height = img.naturalHeight || img.height;
+      const ratio = Math.min(maxWidth / width, maxHeight / height, 1);
+      const targetWidth = Math.max(1, Math.round(width * ratio));
+      const targetHeight = Math.max(1, Math.round(height * ratio));
+      const canvas = document.createElement('canvas');
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return reject(new Error('Canvas not supported'));
+      ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) return reject(new Error('Failed to create blob from canvas'));
+          resolve(blob);
+        },
+        'image/jpeg',
+        quality,
+      );
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+async function fileToBase64WithResize(file: File, tryResize = true) {
+  let blob: Blob = file;
+  const MAX_CLIENT_BYTES = 5 * 1024 * 1024; // 5MB
+  if (tryResize && file.size > MAX_CLIENT_BYTES) {
+    try {
+      const resized = await resizeImageFile(file);
+      if (resized.size > 0) blob = resized;
+    } catch (err) {
+      console.warn('Resize failed, falling back to original file', err);
+    }
+  }
+
+  const arrayBuffer = await blob.arrayBuffer();
+  let binary = '';
+  const bytes = new Uint8Array(arrayBuffer);
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
 export default function AdminPage() {
   const [username, setUsername] = React.useState('');
   const [password, setPassword] = React.useState('');
@@ -198,17 +251,37 @@ export default function AdminPage() {
     const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB per file (client-side)
 
     if (files.length > 0) {
-      const tooLarge = files.find((f) => f.size > MAX_FILE_SIZE);
-      if (tooLarge) {
-        window.alert(`Image "${tooLarge.name}" is too large. Maximum size is 5 MB.`);
-        setStatusMessage('Image too large. Choose smaller image files.');
+      const processedFiles: File[] = [];
+      for (const file of files) {
+        if (file.size <= MAX_FILE_SIZE) {
+          processedFiles.push(file);
+          continue;
+        }
+
+        try {
+          const resizedBlob = await resizeImageFile(file);
+          if (resizedBlob.size <= MAX_FILE_SIZE) {
+            const newName = file.name.replace(/\.[^.]+$/, '') + '.jpg';
+            const newFile = new File([resizedBlob], newName, { type: 'image/jpeg' });
+            processedFiles.push(newFile);
+          } else {
+            window.alert(`Image "${file.name}" is too large even after compression.`);
+            setStatusMessage(`Image ${file.name} too large after compression.`);
+          }
+        } catch (err) {
+          console.error('Image resize failed:', err);
+          window.alert(`Failed to process image ${file.name}.`);
+        }
+      }
+
+      if (processedFiles.length === 0) {
         return;
       }
 
       try {
         productData.imagesToUpload = await Promise.all(
-          files.map(async (file) => {
-            const base64 = await fileToBase64(file);
+          processedFiles.map(async (file) => {
+            const base64 = await fileToBase64WithResize(file, false);
 
             return {
               contentType: file.type || 'application/octet-stream',
@@ -593,18 +666,33 @@ export default function AdminPage() {
                         type="file"
                         accept="image/*"
                         multiple
-                        onChange={(event) => {
-                          const files = Array.from(event.currentTarget.files || []);
+                        onChange={async (event) => {
                           const MAX_FILE_SIZE = 5 * 1024 * 1024;
-                          const tooLarge = files.find((f) => f.size > MAX_FILE_SIZE);
-                          if (tooLarge) {
-                            window.alert(`Image "${tooLarge.name}" is too large. Maximum size is 5 MB.`);
-                            setStatusMessage('One or more images exceed 5 MB and were not selected.');
-                            return;
+                          const rawFiles = Array.from(event.currentTarget.files || []);
+                          const processed: File[] = [];
+                          for (const file of rawFiles) {
+                            if (file.size <= MAX_FILE_SIZE) {
+                              processed.push(file);
+                              continue;
+                            }
+                            try {
+                              const resized = await resizeImageFile(file);
+                              if (resized.size <= MAX_FILE_SIZE) {
+                                const newName = file.name.replace(/\.[^.]+$/, '') + '.jpg';
+                                processed.push(new File([resized], newName, { type: 'image/jpeg' }));
+                              } else {
+                                window.alert(`Image "${file.name}" is too large even after compression.`);
+                                setStatusMessage(`Image ${file.name} too large after compression.`);
+                              }
+                            } catch (err) {
+                              console.error('Resize error on select', err);
+                              window.alert(`Could not process image ${file.name}.`);
+                            }
                           }
 
-                          setSelectedImageFiles(files);
-                          setImagePreviewUrls(files.map((file) => URL.createObjectURL(file)));
+                          if (processed.length === 0) return;
+                          setSelectedImageFiles(processed);
+                          setImagePreviewUrls(processed.map((file) => URL.createObjectURL(file)));
                         }}
                         className="mt-2 w-full rounded-3xl border border-white/10 bg-slate-900 px-4 py-3 text-white outline-none file:cursor-pointer file:border-0 file:bg-cyan-400/10 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-cyan-200 file:transition file:hover:bg-cyan-400/20"
                       />
