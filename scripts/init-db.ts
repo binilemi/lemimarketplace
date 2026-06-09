@@ -89,11 +89,30 @@ async function setupDatabase() {
         product_id BIGINT REFERENCES products(id) ON DELETE CASCADE,
         customer_name TEXT,
         customer_contact TEXT,
-        status TEXT DEFAULT 'Pending' CHECK (status IN ('Pending', 'Confirmed', 'Delivered', 'Cancelled')),
+        quantity NUMERIC DEFAULT 1,
+        total_price NUMERIC DEFAULT 0,
+        payment_method TEXT DEFAULT 'cash',
+        payment_screenshot_url TEXT,
+        shipping_region TEXT,
+        shipping_city TEXT,
+        shipping_sub_city TEXT,
+        shipping_address TEXT,
+        notes TEXT,
+        status TEXT DEFAULT 'Pending' CHECK (status IN ('Pending', 'Confirmed', 'Rejected', 'Shipped', 'Delivered', 'Cancelled')),
         created_at TIMESTAMP DEFAULT now(),
         updated_at TIMESTAMP DEFAULT now()
       );
     `);
+    await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS quantity NUMERIC DEFAULT 1;`);
+    await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS total_price NUMERIC DEFAULT 0;`);
+    await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method TEXT DEFAULT 'cash';`);
+    await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_screenshot_url TEXT;`);
+    await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_region TEXT;`);
+    await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_city TEXT;`);
+    await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_sub_city TEXT;`);
+    await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_address TEXT;`);
+    await client.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS notes TEXT;`);
+    await client.query(`ALTER TABLE orders ALTER COLUMN status SET DEFAULT 'Pending';`);
     console.log('✓ Orders table created');
 
     // Create indexes

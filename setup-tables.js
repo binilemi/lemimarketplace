@@ -1,8 +1,31 @@
 const https = require('https');
+const fs = require('fs');
+const path = require('path');
 
-const projectId = 'cywxjqjixgqhgvesqxbi';
-const anonKey = 'sb_publishable_WYD2UZ91DN_YHK4RfMrLug_4tj1lOiv';
-const serviceKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN5d3hqcWppeGdxaGd2ZXNxeGJpIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczODI4NTUwMSwiZXhwIjoxNzU0NjkxNTAxfQ.1234567890';
+const envPath = path.resolve(__dirname, '.env.local');
+if (fs.existsSync(envPath)) {
+  const rawEnv = fs.readFileSync(envPath, 'utf8');
+  rawEnv.split(/\r?\n/).forEach((line) => {
+    const match = line.match(/^([^=]+)=(.*)$/);
+    if (match) {
+      const key = match[1].trim();
+      const value = match[2].trim();
+      if (key && value && !process.env[key]) {
+        process.env[key] = value;
+      }
+    }
+  });
+}
+
+const projectId = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/^https?:\/\//, '').replace(/\.supabase\.co.*$/, '') || 'cywxjqjixgqhgvesqxbi';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || `https://${projectId}.supabase.co`;
+const anonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_WYD2UZ91DN_YHK4RfMrLug_4tj1lOiv';
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+
+if (!serviceKey) {
+  console.error('❌ SUPABASE_SERVICE_ROLE_KEY is required in environment or .env.local');
+  process.exit(1);
+}
 
 async function executeSQL(sql) {
   return new Promise((resolve, reject) => {
@@ -15,6 +38,7 @@ async function executeSQL(sql) {
         'Content-Type': 'application/json',
         'Content-Length': data.length,
         'apikey': anonKey,
+        'Authorization': `Bearer ${serviceKey}`,
       }
     };
 
@@ -69,6 +93,15 @@ async function setupDB() {
       product_id BIGINT REFERENCES public.products(id) ON DELETE CASCADE,
       customer_name TEXT,
       customer_contact TEXT,
+      quantity NUMERIC DEFAULT 1,
+      total_price NUMERIC DEFAULT 0,
+      payment_method TEXT DEFAULT 'cash',
+      payment_screenshot_url TEXT,
+      shipping_region TEXT,
+      shipping_city TEXT,
+      shipping_sub_city TEXT,
+      shipping_address TEXT,
+      notes TEXT,
       status TEXT DEFAULT 'Pending',
       created_at TIMESTAMP DEFAULT now(),
       updated_at TIMESTAMP DEFAULT now()
@@ -82,6 +115,29 @@ async function setupDB() {
       console.log('✓ Table created successfully\n');
     } catch (err) {
       console.error('✗ Error:', err.message, '\n');
+    }
+  }
+
+  const orderColumns = [
+    `ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS quantity NUMERIC DEFAULT 1;`,
+    `ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS total_price NUMERIC DEFAULT 0;`,
+    `ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS payment_method TEXT DEFAULT 'cash';`,
+    `ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS payment_screenshot_url TEXT;`,
+    `ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS shipping_region TEXT;`,
+    `ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS shipping_city TEXT;`,
+    `ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS shipping_sub_city TEXT;`,
+    `ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS shipping_address TEXT;`,
+    `ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS notes TEXT;`,
+    `ALTER TABLE public.orders ALTER COLUMN status SET DEFAULT 'Pending';`
+  ];
+
+  for (const sql of orderColumns) {
+    try {
+      console.log('Executing orders schema update...');
+      await executeSQL(sql);
+      console.log('✓ Orders column updated successfully\n');
+    } catch (err) {
+      console.error('✗ Error updating orders schema:', err.message, '\n');
     }
   }
 

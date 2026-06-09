@@ -15,7 +15,7 @@ export default function Navbar() {
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
         <Link href="/" className="inline-flex items-center gap-3 text-base md:text-lg font-semibold text-white">
           <Sparkles className="h-6 w-6 text-cyan-400" />
-          Lemi's Marketplace
+          Lemi&apos;s Marketplace
         </Link>
         <div className="hidden items-center gap-8 md:flex">
           {navItems.map((item) => (

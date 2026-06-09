@@ -29,9 +29,9 @@ echo "Creating orders table..."
 # Create orders table
 curl -X POST "$SUPABASE_URL/rest/v1/sql" \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+  -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
   -d '{
-    "query": "CREATE TABLE IF NOT EXISTS orders (id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY, product_id BIGINT REFERENCES products(id) ON DELETE CASCADE, customer_name TEXT, customer_contact TEXT, status TEXT DEFAULT '\''Pending'\'', created_at TIMESTAMP DEFAULT now(), updated_at TIMESTAMP DEFAULT now());"
+    "query": "CREATE TABLE IF NOT EXISTS orders (id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY, product_id BIGINT REFERENCES products(id) ON DELETE CASCADE, customer_name TEXT, customer_contact TEXT, quantity NUMERIC DEFAULT 1, total_price NUMERIC DEFAULT 0, payment_method TEXT DEFAULT '\''cash'\'', payment_screenshot_url TEXT, shipping_region TEXT, shipping_city TEXT, shipping_sub_city TEXT, shipping_address TEXT, notes TEXT, status TEXT DEFAULT '\''Pending'\'', created_at TIMESTAMP DEFAULT now(), updated_at TIMESTAMP DEFAULT now());"
   }'
 
 echo ""

@@ -3,6 +3,7 @@
 import React from 'react';
 import { ArrowRight, ShoppingBag, Send } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { categories as defaultCategories } from '../lib/data';
 import { createClient as createBrowserClient } from '../utils/supabase/client';
@@ -23,18 +24,6 @@ type ProductCard = {
   featured: boolean;
 };
 
-function formatTelegramLink(product: ProductCard, origin: string) {
-  const productUrl = origin ? `${origin}/?product=${encodeURIComponent(product.name)}` : `/?product=${encodeURIComponent(product.name)}`;
-  const message = encodeURIComponent(
-    `Hello, I want to order:\n` +
-      `Product: ${product.name}\n` +
-      `Price: ${product.price} ETB\n` +
-      `Image: ${product.images?.[0] ?? product.image}\n` +
-      `Link: ${productUrl}`,
-  );
-  return `https://t.me/leonmsgn?text=${message}`;
-}
-
 export default function HomePage() {
   const [allProducts, setAllProducts] = React.useState<ProductCard[]>([]);
   const [categoryOptions, setCategoryOptions] = React.useState<string[]>(['All']);
@@ -45,6 +34,7 @@ export default function HomePage() {
   const [detailImageIndex, setDetailImageIndex] = React.useState(0);
   const [origin, setOrigin] = React.useState('');
   const productsSectionRef = React.useRef<HTMLElement | null>(null);
+  const router = useRouter();
 
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -226,15 +216,12 @@ export default function HomePage() {
                     <motion.div
                       key={product.id}
                       whileHover={{ y: -6 }}
-                      onClick={() => {
-                        setSelectedProduct(product);
-                        setDetailImageIndex(0);
-                      }}
+                      onClick={() => router.push(`/product/${product.id}`)}
                       className="group relative cursor-pointer overflow-hidden rounded-[2rem] border border-white/10 bg-slate-950/90 shadow-glass backdrop-blur-xl transition"
                     >
                       <div className="relative overflow-hidden">
-                        <img src={currentImage} alt={product.name} className="h-52 w-full object-cover transition duration-500 group-hover:scale-105 sm:h-64" />
-                        <span className="absolute left-4 top-4 rounded-full bg-emerald-500/15 px-3 py-1 text-sm text-emerald-300">{product.discount}% off</span>
+                        <img src={currentImage} alt={product.name} className="h-44 w-full object-cover transition duration-500 group-hover:scale-105 sm:h-56 md:h-64" />
+                        <span className="absolute left-3 top-3 rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs text-emerald-300 sm:text-sm">{product.discount}% off</span>
                         {images.length > 1 ? (
                           <div className="absolute inset-x-0 top-1/2 flex items-center justify-between px-3">
                             <button
@@ -266,26 +253,24 @@ export default function HomePage() {
                           </div>
                         ) : null}
                       </div>
-                      <div className="space-y-4 p-5">
+                      <div className="space-y-4 p-4 sm:p-5">
                         <div>
-                          <h4 className="text-2xl font-semibold">{product.name}</h4>
+                          <h4 className="text-xl font-semibold sm:text-2xl">{product.name}</h4>
                           <p className="mt-2 text-sm text-slate-400">{product.category}</p>
                         </div>
                         <div className="flex items-center justify-between gap-3">
                           <div>
-                            <p className="text-2xl font-bold text-white">{product.price} ETB</p>
+                            <p className="text-xl font-bold text-white sm:text-2xl">{product.price} ETB</p>
                             <p className="text-sm text-slate-500 line-through">{product.originalPrice} ETB</p>
                           </div>
-                          <a
-                            href={formatTelegramLink(product, origin)}
-                            target="_blank"
-                            rel="noreferrer"
+                          <Link
+                            href={`/product/${product.id}`}
                             onClick={(event) => event.stopPropagation()}
                             className="inline-flex items-center gap-2 rounded-3xl bg-cyan-400 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
                           >
-                            Order now
+                            Detail
                             <ShoppingBag size={18} />
-                          </a>
+                          </Link>
                         </div>
                       </div>
                     </motion.div>
@@ -303,37 +288,35 @@ export default function HomePage() {
           onClick={() => setSelectedProduct(null)}
         >
           <div
-            className="w-full max-w-4xl rounded-[2rem] border border-white/10 bg-slate-950/95 p-5 shadow-glow"
+            className="w-full max-w-3xl rounded-[2rem] border border-white/10 bg-slate-950/95 p-4 shadow-glow sm:p-5"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="grid gap-4 sm:grid-cols-[120px_1fr] sm:items-start">
               <img
                 src={selectedProduct.images?.[detailImageIndex] ?? selectedProduct.image}
                 alt={selectedProduct.name}
-                className="h-44 w-full rounded-[1.5rem] object-cover sm:h-56"
+                className="h-36 w-full rounded-[1.5rem] object-cover sm:h-52"
               />
               <div className="flex flex-col justify-between gap-4">
                 <div>
                   <p className="text-xs uppercase tracking-[0.35em] text-cyan-300">{selectedProduct.category}</p>
-                  <h3 className="mt-2 text-2xl font-semibold text-white">{selectedProduct.name}</h3>
+                  <h3 className="mt-2 text-xl font-semibold text-white sm:text-2xl">{selectedProduct.name}</h3>
                   <p className="mt-3 text-sm leading-6 text-slate-300">{selectedProduct.description}</p>
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <p className="text-2xl font-bold text-white">{selectedProduct.price} ETB</p>
+                    <p className="text-xl font-bold text-white sm:text-2xl">{selectedProduct.price} ETB</p>
                     {selectedProduct.originalPrice ? (
                       <p className="text-sm text-slate-500 line-through">{selectedProduct.originalPrice} ETB</p>
                     ) : null}
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <a
-                      href={formatTelegramLink(selectedProduct, origin)}
-                      target="_blank"
-                      rel="noreferrer"
+                    <Link
+                      href={`/product/${selectedProduct.id}`}
                       className="inline-flex items-center gap-2 rounded-3xl bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
                     >
                       Order now
-                    </a>
+                    </Link>
                     <button
                       type="button"
                       onClick={() => setSelectedProduct(null)}

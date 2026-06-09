@@ -6,6 +6,24 @@ import { ArrowRight, BarChart3, Box, CheckCircle2, Edit, Layers, LogOut, Message
 import { createClient as createBrowserClient } from '../../utils/supabase/client';
 import { productSeed, type ProductItem } from '../../lib/data';
 
+type AdminOrder = {
+  id: number;
+  product_id: number;
+  customer_name?: string;
+  customer_contact?: string;
+  quantity?: number;
+  total_price?: number;
+  payment_method?: string;
+  payment_screenshot_url?: string;
+  shipping_region?: string;
+  shipping_city?: string;
+  shipping_sub_city?: string;
+  shipping_address?: string;
+  notes?: string;
+  status?: string;
+  created_at?: string;
+};
+
 const STORAGE_KEY = 'ethio-admin-settings';
 const DEFAULT_USERNAME = 'lemi';
 const DEFAULT_PASSWORD = '1111';
@@ -93,6 +111,12 @@ export default function AdminPage() {
   const [adminPassword, setAdminPassword] = React.useState(DEFAULT_PASSWORD);
   const [activeView, setActiveView] = React.useState<'dashboard' | 'products' | 'orders' | 'settings'>('dashboard');
   const [products, setProducts] = React.useState<ProductItem[]>(productSeed);
+  const [orders, setOrders] = React.useState<AdminOrder[]>([]);
+  const [selectedOrderFilter, setSelectedOrderFilter] = React.useState<'all' | 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'rejected'>('all');
+  const [previewImageUrl, setPreviewImageUrl] = React.useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = React.useState<number | null>(null);
+  const [viewedProduct, setViewedProduct] = React.useState<ProductItem | null>(null);
+  const [expandedOrders, setExpandedOrders] = React.useState<Record<number, boolean>>({});
   const [formOpen, setFormOpen] = React.useState(false);
   const [editingProduct, setEditingProduct] = React.useState<ProductItem | null>(null);
   const [loading, setLoading] = React.useState(true);
@@ -121,6 +145,11 @@ export default function AdminPage() {
       return matchesCategory && matchesSearch;
     });
   }, [products, productSearch, selectedProductCategory]);
+
+  const visibleOrders = React.useMemo(() => {
+    if (selectedOrderFilter === 'all') return orders;
+    return orders.filter((order) => String(order.status)?.toLowerCase() === selectedOrderFilter);
+  }, [orders, selectedOrderFilter]);
 
   React.useEffect(() => {
     const storedSettings = getStoredSettings();
@@ -152,6 +181,16 @@ export default function AdminPage() {
           setProducts(productData as ProductItem[]);
           console.log(`[Admin] Loaded ${productData.length} products from Supabase`);
           setStatusMessage(`✓ Loaded ${productData.length} products from Supabase.`);
+        }
+
+        const { data: ordersData, error: ordersError } = await supabase
+          .from('orders')
+          .select('*')
+          .order('id', { ascending: false });
+        if (ordersError) {
+          console.error('[Admin] Orders error:', ordersError.code, ordersError.message);
+        } else if (ordersData) {
+          setOrders(ordersData as AdminOrder[]);
         }
       } catch (err) {
         setStatusMessage(`Error loading data: ${String(err)}`);
@@ -210,6 +249,50 @@ export default function AdminPage() {
 
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ username: adminUsername, password: adminPassword }));
     window.alert('Credentials updated. Use the new login values next time.');
+  };
+
+  const updateOrderStatus = async (orderId: number, status: string) => {
+    try {
+      const response = await fetch('/api/orders', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: orderId, status }),
+      });
+      const result = await response.json();
+      if (response.ok && result.order) {
+        setOrders((current) => current.map((order) => (order.id === orderId ? { ...order, status } : order)));
+      } else {
+        window.alert(result.error || 'Failed to update order status.');
+      }
+    } catch (err) {
+      console.error(err);
+      window.alert('Could not update order status right now.');
+    }
+  };
+
+  const deleteOrder = async (orderId: number) => {
+    // Open the custom confirmation modal instead of using native confirm
+    setConfirmDeleteId(orderId);
+  };
+
+  const performDeleteOrder = async (orderId: number) => {
+    try {
+      const response = await fetch('/api/orders', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: orderId }),
+      });
+      const result = await response.json();
+      if (!response.ok) {
+        window.alert(result.error || 'Failed to delete order.');
+        return;
+      }
+      setOrders((current) => current.filter((order) => order.id !== orderId));
+      setConfirmDeleteId(null);
+    } catch (err) {
+      console.error(err);
+      window.alert('Could not delete order right now.');
+    }
   };
 
   const refreshProducts = async () => {
@@ -470,9 +553,12 @@ export default function AdminPage() {
     );
   }
 
-  const totalProducts = products.length;
-  const pendingOrders = 3;
-  const revenueEstimate = totalProducts * 4200;
+  const totalOrders = orders.length;
+  const pendingOrders = orders.filter((order) => String(order.status)?.toLowerCase() === 'pending').length;
+  const confirmedOrders = orders.filter((order) => String(order.status)?.toLowerCase() === 'confirmed').length;
+  const shippedOrders = orders.filter((order) => String(order.status)?.toLowerCase() === 'shipped').length;
+  const deliveredOrders = orders.filter((order) => String(order.status)?.toLowerCase() === 'delivered').length;
+  const rejectedOrders = orders.filter((order) => String(order.status)?.toLowerCase() === 'rejected').length;
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100">
@@ -480,7 +566,7 @@ export default function AdminPage() {
         <aside className="rounded-[2rem] border border-white/10 bg-slate-900/90 p-5 shadow-glass backdrop-blur-xl">
           <div className="mb-8 space-y-2">
             <p className="text-sm uppercase tracking-[0.35em] text-cyan-300">Admin Panel</p>
-            <h2 className="text-3xl font-bold">Lemi's Marketplace</h2>
+            <h2 className="text-3xl font-bold">Lemi&apos;s Marketplace</h2>
             <p className="text-sm text-slate-400">Manage products, monitor orders, and update your storefront.</p>
           </div>
           <nav className="space-y-2 text-sm text-slate-300">
@@ -515,16 +601,27 @@ export default function AdminPage() {
                 <MessageCircle className="h-4 w-4 text-cyan-300" /> Live Telegram orders
               </div>
             </div>
-            <div className="mt-8 grid gap-4 md:grid-cols-3">
+            <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6">
               {[
-                { label: 'Total products', value: totalProducts, accent: 'bg-cyan-400/10 text-cyan-200' },
-                { label: 'Pending orders', value: pendingOrders, accent: 'bg-violet-400/10 text-violet-200' },
-                { label: 'Revenue estimate', value: `~${revenueEstimate.toLocaleString()} ETB`, accent: 'bg-emerald-400/10 text-emerald-200' },
+                { label: 'Total orders', value: totalOrders, accent: 'bg-cyan-400/10 text-cyan-200', filter: 'all' },
+                { label: 'Pending', value: pendingOrders, accent: 'bg-violet-400/10 text-violet-200', filter: 'pending' },
+                { label: 'Confirmed', value: confirmedOrders, accent: 'bg-emerald-500/10 text-emerald-200', filter: 'confirmed' },
+                { label: 'Shipped', value: shippedOrders, accent: 'bg-sky-400/10 text-sky-200', filter: 'shipped' },
+                { label: 'Delivered', value: deliveredOrders, accent: 'bg-cyan-400/10 text-cyan-200', filter: 'delivered' },
+                { label: 'Rejected', value: rejectedOrders, accent: 'bg-red-400/10 text-red-200', filter: 'rejected' },
               ].map((card) => (
-                <div key={card.label} className={`rounded-3xl border border-white/10 p-5 ${card.accent}`}>
-                  <p className="text-sm uppercase tracking-[0.35em] text-slate-400">{card.label}</p>
-                  <p className="mt-4 text-2xl font-semibold text-white">{card.value}</p>
-                </div>
+                <button
+                  key={card.label}
+                  type="button"
+                  onClick={() => {
+                    setActiveView('orders');
+                    setSelectedOrderFilter(card.filter as any);
+                  }}
+                  className={`rounded-3xl border border-white/10 p-4 text-left transition ${card.accent} ${selectedOrderFilter === card.filter ? 'ring-2 ring-cyan-400/60' : 'hover:border-cyan-400/30 hover:bg-white/5'} min-h-[120px] overflow-hidden`}
+                >
+                  <p className="text-xs uppercase tracking-[0.2em] text-slate-400">{card.label}</p>
+                  <p className="mt-4 text-xl font-semibold text-white sm:text-2xl break-words">{card.value}</p>
+                </button>
               ))}
             </div>
           </div>
@@ -809,23 +906,105 @@ export default function AdminPage() {
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-sm uppercase tracking-[0.35em] text-cyan-300">Orders</p>
-                  <h2 className="text-3xl font-semibold">Telegram order feed</h2>
+                  <h2 className="text-3xl font-semibold">Order management</h2>
                 </div>
                 <span className="rounded-3xl bg-slate-950/80 px-4 py-3 text-sm text-slate-300">Manual fulfilment only</span>
               </div>
               <div className="mt-8 grid gap-4">
-                {products.map((product) => (
-                  <div key={product.id} className="rounded-3xl border border-white/10 bg-slate-950/90 p-6">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <p className="text-sm text-slate-400">Order ID #{product.id}</p>
-                        <p className="mt-2 text-xl font-semibold">{product.name}</p>
-                      </div>
-                      <span className="rounded-full bg-amber-500/10 px-3 py-1 text-sm text-amber-200">{product.status === 'Pending' ? 'Pending' : 'Confirmed'}</span>
-                    </div>
-                    <p className="mt-4 text-sm text-slate-400">Customer requested this product. Order message is ready for Telegram delivery.</p>
+                {visibleOrders.length === 0 ? (
+                  <div className="rounded-3xl border border-white/10 bg-slate-950/90 p-6 text-slate-400">
+                    No orders match this filter. Try another status or reset to Total orders.
                   </div>
-                ))}
+                ) : (
+                  visibleOrders.map((order) => {
+                    const product = products.find((item) => item.id === Number(order.product_id));
+                    const isExpanded = !!expandedOrders[order.id];
+                    return (
+                      <div key={order.id}>
+                        {!isExpanded ? (
+                          <div
+                            onClick={() => setExpandedOrders((s) => ({ ...s, [order.id]: true }))}
+                            role="button"
+                            tabIndex={0}
+                            className="rounded-3xl border border-white/10 bg-slate-950/90 p-4 sm:p-6 flex items-center justify-between cursor-pointer hover:bg-white/5 transition"
+                          >
+                            <div className="min-w-0">
+                              <p className="text-sm text-slate-400">Order ID #{order.id}</p>
+                              <p className="text-lg font-semibold text-white break-words">{product?.name ?? `Product #${order.product_id}`}</p>
+                              <p className="text-sm text-slate-400">Total: {order.total_price != null ? `${order.total_price} ETB` : 'Unknown'}</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className={`inline-flex rounded-full px-3 py-1 text-sm ${order.status === 'Pending' ? 'bg-amber-500/10 text-amber-200' : order.status === 'Confirmed' ? 'bg-emerald-500/10 text-emerald-200' : order.status === 'Rejected' ? 'bg-red-500/10 text-red-200' : order.status === 'Shipped' ? 'bg-sky-500/10 text-sky-200' : order.status === 'Delivered' ? 'bg-cyan-500/10 text-cyan-200' : 'bg-white/5 text-slate-300'}`}>{order.status ?? 'Pending'}</span>
+                              <button onClick={(e) => { e.stopPropagation(); setExpandedOrders((s) => ({ ...s, [order.id]: true })); }} className="rounded-3xl bg-cyan-400 px-3 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300">Expand</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="rounded-3xl border border-white/10 bg-slate-950/90 p-4 sm:p-6">
+                            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                              <div className="space-y-2 min-w-0">
+                                <p className="text-sm text-slate-400">Order ID #{order.id}</p>
+                                <p className="text-lg font-semibold text-white sm:text-xl break-words">{product?.name ?? `Product #${order.product_id}`}</p>
+                                <p className="text-sm text-slate-400">Customer: {order.customer_name ?? 'N/A'}</p>
+                                <p className="text-sm text-slate-400">Phone: {order.customer_contact ?? 'N/A'}</p>
+                              </div>
+                              <div className="space-y-2 text-right min-w-0">
+                                <div className="flex items-center justify-end gap-2">
+                                  <button onClick={() => setExpandedOrders((s) => ({ ...s, [order.id]: false }))} className="rounded-3xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white transition hover:bg-white/10">Collapse</button>
+                                  <span className={`inline-flex rounded-full px-3 py-1 text-sm ${order.status === 'Pending' ? 'bg-amber-500/10 text-amber-200' : order.status === 'Confirmed' ? 'bg-emerald-500/10 text-emerald-200' : order.status === 'Rejected' ? 'bg-red-500/10 text-red-200' : order.status === 'Shipped' ? 'bg-sky-500/10 text-sky-200' : order.status === 'Delivered' ? 'bg-cyan-500/10 text-cyan-200' : 'bg-white/5 text-slate-300'}`}>{order.status ?? 'Pending'}</span>
+                                  <p className="text-sm text-slate-400">Total: {order.total_price != null ? `${order.total_price} ETB` : 'Unknown'}</p>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                              {order.quantity != null ? (
+                                <div className="rounded-3xl bg-slate-900/80 p-4 text-sm text-slate-300">
+                                  <p className="font-semibold text-white">Quantity</p>
+                                  <p className="mt-2">{order.quantity}</p>
+                                </div>
+                              ) : null}
+                              <div className="rounded-3xl bg-slate-900/80 p-4 text-sm text-slate-300">
+                                <p className="font-semibold text-white">Payment</p>
+                                <p className="mt-2">{order.payment_method ?? 'Cash on Delivery'}</p>
+                              </div>
+                              <div className="rounded-3xl bg-slate-900/80 p-4 text-sm text-slate-300">
+                                <p className="font-semibold text-white">Shipping</p>
+                                <p className="mt-2 break-words">
+                                  {order.shipping_region ?? ''}
+                                  {order.shipping_city ? `, ${order.shipping_city}` : ''}
+                                  {order.shipping_sub_city ? `, ${order.shipping_sub_city}` : ''}
+                                </p>
+                              </div>
+                            </div>
+                            {order.payment_screenshot_url ? (
+                              <div className="mt-4 rounded-3xl border border-white/10 bg-slate-900/80 p-3">
+                                <p className="text-sm text-slate-400">Payment proof</p>
+                                <button type="button" onClick={() => setPreviewImageUrl(order.payment_screenshot_url ?? null)} className="mt-3 block w-full overflow-hidden rounded-3xl focus:outline-none focus:ring-2 focus:ring-cyan-400/50">
+                                  <img src={order.payment_screenshot_url} alt={`Receipt for order ${order.id}`} className="max-h-36 w-full rounded-3xl object-contain" />
+                                </button>
+                              </div>
+                            ) : null}
+                            {order.notes ? (
+                              <div className="mt-4 rounded-3xl bg-slate-900/80 p-4 text-sm text-slate-300">
+                                <p className="font-semibold text-white">Customer notes</p>
+                                <p className="mt-2 break-words">{order.notes}</p>
+                              </div>
+                            ) : null}
+                            <div className="mt-6 flex flex-wrap gap-2">
+                              <button onClick={() => setViewedProduct(product ?? null)} disabled={!product} className="rounded-3xl bg-white/5 px-3 py-2 text-sm text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50">
+                                View product info
+                              </button>
+                              <button onClick={() => updateOrderStatus(order.id, 'Confirmed')} className="rounded-3xl bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200 transition hover:bg-emerald-500/20">Confirm</button>
+                              <button onClick={() => updateOrderStatus(order.id, 'Rejected')} className="rounded-3xl bg-red-500/10 px-3 py-2 text-sm text-red-300 transition hover:bg-red-500/20">Reject</button>
+                              <button onClick={() => updateOrderStatus(order.id, 'Shipped')} className="rounded-3xl bg-sky-500/10 px-3 py-2 text-sm text-sky-200 transition hover:bg-sky-500/20">Mark as Shipped</button>
+                              <button onClick={() => updateOrderStatus(order.id, 'Delivered')} className="rounded-3xl bg-cyan-500/10 px-3 py-2 text-sm text-cyan-200 transition hover:bg-cyan-500/20">Delivered</button>
+                              <button onClick={() => setConfirmDeleteId(order.id)} className="rounded-3xl bg-red-500/10 px-3 py-2 text-sm text-red-300 transition hover:bg-red-500/20">Delete</button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
           )}
@@ -851,6 +1030,90 @@ export default function AdminPage() {
               </button>
             </div>
           )}
+          {previewImageUrl ? (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/95 px-4 py-6 backdrop-blur-sm">
+              <button
+                type="button"
+                onClick={() => setPreviewImageUrl(null)}
+                className="absolute right-6 top-6 rounded-full bg-white/10 px-4 py-3 text-sm text-white transition hover:bg-white/20"
+              >
+                Close
+              </button>
+              <img src={previewImageUrl} alt="Order screenshot preview" className="max-h-[90vh] max-w-full rounded-3xl object-contain shadow-2xl" />
+            </div>
+          ) : null}
+          {confirmDeleteId ? (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+              <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-slate-900/95 p-6 shadow-lg">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-500/10">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-white">Delete order</p>
+                    <p className="mt-2 text-sm text-slate-300">Are you sure you want to permanently delete this order? This action cannot be undone.</p>
+                    <div className="mt-6 flex items-center gap-3">
+                      <button onClick={() => setConfirmDeleteId(null)} className="inline-flex items-center justify-center rounded-3xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white transition hover:bg-white/10">Cancel</button>
+                      <button onClick={() => performDeleteOrder(confirmDeleteId as number)} className="inline-flex items-center justify-center rounded-3xl bg-red-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-600">Delete permanently</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
+          {viewedProduct ? (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+              <div className="w-full max-w-3xl rounded-[2rem] border border-white/10 bg-slate-950/95 p-4 shadow-glow sm:p-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.35em] text-cyan-300">{viewedProduct.category}</p>
+                    <h3 className="mt-2 text-xl font-semibold text-white sm:text-2xl">{viewedProduct.name}</h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setViewedProduct(null)}
+                    className="rounded-3xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-white transition hover:bg-white/10"
+                  >
+                    Close
+                  </button>
+                </div>
+                <div className="mt-6 grid gap-6 sm:grid-cols-[180px_1fr]">
+                  <img
+                    src={viewedProduct.images?.[0] ?? viewedProduct.image ?? ''}
+                    alt={viewedProduct.name}
+                    className="h-44 w-full rounded-[1.5rem] object-cover sm:h-full"
+                  />
+                  <div className="space-y-4">
+                    <div className="rounded-3xl bg-slate-900/80 p-4 text-sm text-slate-300">
+                      <p className="font-semibold text-white">Product details</p>
+                      <p className="mt-3 leading-6 text-slate-300">{viewedProduct.description ?? 'No additional details available.'}</p>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-3xl bg-slate-900/80 p-4 text-sm text-slate-300">
+                        <p className="font-semibold text-white">Price</p>
+                        <p className="mt-2 text-lg font-semibold text-white">{viewedProduct.price} ETB</p>
+                        {viewedProduct.originalPrice ? (
+                          <p className="text-sm text-slate-500 line-through">{viewedProduct.originalPrice} ETB</p>
+                        ) : null}
+                      </div>
+                      <div className="rounded-3xl bg-slate-900/80 p-4 text-sm text-slate-300">
+                        <p className="font-semibold text-white">Stock</p>
+                        <p className="mt-2 text-lg font-semibold text-white">{viewedProduct.stock}</p>
+                      </div>
+                    </div>
+                    {viewedProduct.discount ? (
+                      <div className="rounded-3xl bg-slate-900/80 p-4 text-sm text-slate-300">
+                        <p className="font-semibold text-white">Discount</p>
+                        <p className="mt-2 text-lg font-semibold text-white">{viewedProduct.discount}% off</p>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </section>
       </div>
     </main>
