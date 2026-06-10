@@ -19,7 +19,10 @@ if (fs.existsSync(envPath)) {
 
 const projectId = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/^https?:\/\//, '').replace(/\.supabase\.co.*$/, '') || 'cywxjqjixgqhgvesqxbi';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || `https://${projectId}.supabase.co`;
-const anonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_WYD2UZ91DN_YHK4RfMrLug_4tj1lOiv';
+const anonKey =
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+  'sb_publishable_WYD2UZ91DN_YHK4RfMrLug_4tj1lOiv';
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 if (!serviceKey) {

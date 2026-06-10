@@ -18,9 +18,9 @@ function readEnv() {
 (async () => {
   const env = readEnv();
   const SUPABASE_URL = env.NEXT_PUBLIC_SUPABASE_URL;
-  const SUPABASE_KEY = env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  const SUPABASE_KEY = env.NEXT_PUBLIC_SUPABASE_ANON_KEY || env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   if (!SUPABASE_URL || !SUPABASE_KEY) {
-    console.error('Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY in .env.local');
+    console.error('Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY / NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY in .env.local');
     process.exit(1);
   }
 
